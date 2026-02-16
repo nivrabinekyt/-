@@ -1,7 +1,7 @@
 
-import React, { useState, useCallback, useEffect } from 'react';
-import { GAMES, STARTING_BASES, CONVERSION_TABLE } from './constants';
-import { GameCategory, GameProfile, PSASession, UserSettings } from './types';
+import React, { useState } from 'react';
+import { GAMES, STARTING_BASES } from './constants';
+import { GameProfile, PSASession, UserSettings } from './types';
 import { getGameInsights, getFinalRecommendation } from './services/geminiService';
 
 // --- Sub-components ---
@@ -44,15 +44,13 @@ const PSAWizard: React.FC<{
   onIterate: (choice: 'lower' | 'upper') => void,
   game: GameProfile,
   dpi: number
-}> = ({ session, onIterate, game, dpi }) => {
+}> = ({ session, onIterate, game }) => {
   const currentIteration = session.iteration;
-  
-  // Calculate display values based on game multiplier
   const displayLower = (session.lower * game.defaultMultiplier).toFixed(3);
   const displayUpper = (session.upper * game.defaultMultiplier).toFixed(3);
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 opacity-100 transition-opacity duration-500">
       <div className="flex justify-between items-center bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">
         <div className="text-right">
           <span className="text-zinc-500 text-xs block mb-1">שלב</span>
@@ -68,42 +66,36 @@ const PSAWizard: React.FC<{
 
       <div className="bg-blue-900/10 border border-blue-500/20 p-4 rounded-xl">
         <p className="text-sm text-blue-300">
-          <strong>הוראות:</strong> הגדר את הרגישות במשחק ובצע בדיקת 180 מעלות על הפד. נסה לעשות פליק (Flick) למטרה דמיונית. האם עברת אותה (Over-flick) או לא הגעת אליה (Under-flick)? בחר את הערך שמרגיש הכי טבעי ושלם.
+          <strong>הוראות:</strong> הגדר את הרגישות במשחק ובצע בדיקת 180 מעלות על הפד. נסה לעשות פליק (Flick) למטרה דמיונית. האם עברת אותה (Over-flick) או לא הגעת אליה (Under-flick)? בחר את הערך שמרגיש הכי טבעי.
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="space-y-4">
-          <div className="text-center p-8 glass rounded-2xl border-2 border-transparent hover:border-red-500/30 transition-all">
-            <h4 className="text-zinc-500 text-sm mb-2 uppercase tracking-widest">רגישות נמוכה</h4>
-            <div className="text-4xl font-black mb-4">{displayLower}</div>
-            <button 
-              onClick={() => onIterate('lower')}
-              className="w-full py-4 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white rounded-xl font-bold transition-all border border-red-500/30"
-            >
-              בחר נמוך
-            </button>
-          </div>
+        <div className="text-center p-8 glass rounded-2xl border-2 border-transparent hover:border-red-500/30 transition-all">
+          <h4 className="text-zinc-500 text-sm mb-2 uppercase tracking-widest text-center">רגישות נמוכה</h4>
+          <div className="text-4xl font-black mb-4">{displayLower}</div>
+          <button 
+            onClick={() => onIterate('lower')}
+            className="w-full py-4 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white rounded-xl font-bold transition-all border border-red-500/30"
+          >
+            בחר נמוך
+          </button>
         </div>
 
-        <div className="space-y-4">
-          <div className="text-center p-8 glass rounded-2xl border-2 border-transparent hover:border-green-500/30 transition-all">
-            <h4 className="text-zinc-500 text-sm mb-2 uppercase tracking-widest">רגישות גבוהה</h4>
-            <div className="text-4xl font-black mb-4">{displayUpper}</div>
-            <button 
-              onClick={() => onIterate('upper')}
-              className="w-full py-4 bg-green-500/10 hover:bg-green-500 text-green-400 hover:text-white rounded-xl font-bold transition-all border border-green-500/30"
-            >
-              בחר גבוה
-            </button>
-          </div>
+        <div className="text-center p-8 glass rounded-2xl border-2 border-transparent hover:border-green-500/30 transition-all">
+          <h4 className="text-zinc-500 text-sm mb-2 uppercase tracking-widest text-center">רגישות גבוהה</h4>
+          <div className="text-4xl font-black mb-4">{displayUpper}</div>
+          <button 
+            onClick={() => onIterate('upper')}
+            className="w-full py-4 bg-green-500/10 hover:bg-green-500 text-green-400 hover:text-white rounded-xl font-bold transition-all border border-green-500/30"
+          >
+            בחר גבוה
+          </button>
         </div>
       </div>
     </div>
   );
 };
-
-// --- Main Application Logic ---
 
 export default function App() {
   const [step, setStep] = useState<'welcome' | 'dpi' | 'game' | 'psa' | 'result'>('welcome');
@@ -134,59 +126,48 @@ export default function App() {
 
   const handlePSAIteration = async (choice: 'lower' | 'upper') => {
     if (!session) return;
-
     const chosenValue = choice === 'lower' ? session.lower : session.upper;
     const newHistory = [...session.history, { iteration: session.iteration, chosen: choice, value: chosenValue }];
 
     if (session.iteration >= 6) {
-      // Finish
       setStep('result');
       const finalSens = (session.lower + session.upper) / 2;
       const finalEdpi = finalSens * settings.dpi;
-      const cm360 = (360 * 2.54) / (settings.dpi * finalSens * 0.022); // Assuming standard m_yaw
+      const cm360 = (360 * 2.54) / (settings.dpi * finalSens * 0.022);
       
       setLoading(true);
       const msg = await getFinalRecommendation(finalEdpi, cm360, selectedGame.name);
       setFinalMsg(msg);
       setLoading(false);
-      
-      // Update session with final state
       setSession(prev => prev ? { ...prev, base: finalSens, iteration: 7, history: newHistory } : null);
       return;
     }
 
-    // Mathematical Calculation for next iteration
-    // The "Perfect Sensitivity" is narrowed down by averaging
     const newIteration = session.iteration + 1;
-    let newBase, newLower, newUpper;
-
+    let newBase;
     if (choice === 'lower') {
         newBase = (session.base + session.lower) / 2;
     } else {
         newBase = (session.base + session.upper) / 2;
     }
 
-    // Standard PSA logic: keep narrowing
     const factor = 0.5 / Math.pow(1.2, newIteration - 1);
-    newLower = newBase * (1 - factor);
-    newUpper = newBase * (1 + factor);
-
     setSession({
       iteration: newIteration,
       base: newBase,
-      lower: newLower,
-      upper: newUpper,
+      lower: newBase * (1 - factor),
+      upper: newBase * (1 + factor),
       history: newHistory
     });
   };
 
   return (
-    <div className="min-h-screen pb-20">
+    <div className="min-h-screen pb-20 bg-[#0a0a0c]">
       <Header />
 
       <main className="max-w-4xl mx-auto px-4 mt-12">
         {step === 'welcome' && (
-          <div className="text-center space-y-8 animate-in slide-in-from-bottom duration-700">
+          <div className="text-center space-y-8 opacity-100 transition-opacity">
             <h2 className="text-5xl font-black mb-4 leading-tight">מצא את ה-Sensitivity<br /><span className="text-blue-500">האופטימלי שלך</span></h2>
             <p className="text-zinc-400 text-lg max-w-xl mx-auto">
               אל תעתיק סתם הגדרות של פרואים. השתמש בשיטת ה-PSA המדעית כדי למצוא את הנקודה המדויקת שבה היד שלך והכוונת הופכים לאחד.
@@ -198,15 +179,15 @@ export default function App() {
               בוא נתחיל
             </button>
             <div className="grid grid-cols-3 gap-4 pt-12">
-              <div className="glass p-4 rounded-xl">
+              <div className="glass p-4 rounded-xl text-center">
                 <div className="text-blue-400 font-bold text-xl">100%</div>
                 <div className="text-xs text-zinc-500 uppercase">דיוק מתמטי</div>
               </div>
-              <div className="glass p-4 rounded-xl">
+              <div className="glass p-4 rounded-xl text-center">
                 <div className="text-violet-400 font-bold text-xl">6 שלבים</div>
                 <div className="text-xs text-zinc-500 uppercase">תהליך מהיר</div>
               </div>
-              <div className="glass p-4 rounded-xl">
+              <div className="glass p-4 rounded-xl text-center">
                 <div className="text-emerald-400 font-bold text-xl">PRO</div>
                 <div className="text-xs text-zinc-500 uppercase">סטנדרט עולמי</div>
               </div>
@@ -267,18 +248,12 @@ export default function App() {
               </h3>
               <p className="text-zinc-400 italic">"{insights || 'מנתח נתונים...'}"</p>
             </div>
-            
-            <PSAWizard 
-              session={session} 
-              onIterate={handlePSAIteration} 
-              game={selectedGame}
-              dpi={settings.dpi}
-            />
+            <PSAWizard session={session} onIterate={handlePSAIteration} game={selectedGame} dpi={settings.dpi} />
           </div>
         )}
 
         {step === 'result' && session && (
-          <div className="max-w-2xl mx-auto space-y-8 animate-in zoom-in duration-500">
+          <div className="max-w-2xl mx-auto space-y-8 opacity-100 transition-all duration-700">
             <div className="text-center">
               <div className="inline-block p-4 bg-green-500/20 rounded-full mb-4">
                 <svg className="w-12 h-12 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -290,24 +265,17 @@ export default function App() {
             </div>
 
             <div className="glass p-10 rounded-3xl relative overflow-hidden text-center border-green-500/30">
-              <div className="absolute top-0 right-0 p-4 opacity-10">
-                <svg className="w-32 h-32" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
-                  <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
-                </svg>
-              </div>
-              
               <div className="text-7xl font-black text-white mb-2">
                 {(session.base * selectedGame.defaultMultiplier).toFixed(3)}
               </div>
-              <div className="text-green-400 font-bold tracking-widest uppercase mb-8">רגישות מומלצת</div>
+              <div className="text-green-400 font-bold tracking-widest uppercase mb-8 text-center">רגישות מומלצת</div>
 
               <div className="grid grid-cols-2 gap-4 border-t border-zinc-800 pt-8">
-                <div>
+                <div className="text-center">
                   <div className="text-2xl font-bold text-zinc-200">{(session.base * settings.dpi).toFixed(0)}</div>
                   <div className="text-xs text-zinc-500 uppercase">eDPI</div>
                 </div>
-                <div>
+                <div className="text-center">
                   <div className="text-2xl font-bold text-zinc-200">
                     {((360 * 2.54) / (settings.dpi * session.base * 0.022)).toFixed(1)}
                   </div>
@@ -317,7 +285,7 @@ export default function App() {
             </div>
 
             {finalMsg && (
-              <div className="bg-blue-900/10 p-6 rounded-2xl border border-blue-500/20 text-blue-200 leading-relaxed">
+              <div className="bg-blue-900/10 p-6 rounded-2xl border border-blue-500/20 text-blue-200 leading-relaxed text-right">
                 {finalMsg}
               </div>
             )}
@@ -346,10 +314,10 @@ export default function App() {
         )}
 
         {loading && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
             <div className="text-center space-y-4">
               <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-              <p className="text-xl font-bold text-white animate-pulse">מנתח נתונים ובונה פרופיל...</p>
+              <p className="text-xl font-bold text-white">מנתח נתונים ובונה פרופיל...</p>
             </div>
           </div>
         )}
